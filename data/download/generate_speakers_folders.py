@@ -60,8 +60,15 @@ def process_audio_files(root_directory):
                 chunk_path = os.path.join(path_sp, f"{end}.wav")
                 audio_chunk.export(chunk_path, format="wav")
 
-            # Concatenate all chunks
-            chunk_files = [f for f in os.listdir(path_sp) if f.endswith(".wav")]
+            # Concatenate all chunks. Excludes the script's own prior output
+            # (recording_concatenated.wav) so re-running against an
+            # already-processed speaker folder is idempotent instead of
+            # crashing on float(): only timestamp-named segment files sort
+            # numerically, not the concatenated file itself.
+            chunk_files = [
+                f for f in os.listdir(path_sp)
+                if f.endswith(".wav") and f != "recording_concatenated.wav"
+            ]
             chunk_files.sort(key=lambda x: float(x.split(".wav")[0]))
             sorted_chunk_paths = [os.path.join(path_sp, f) for f in chunk_files]
 

@@ -17,6 +17,16 @@ def download_youtube_content(base_output_path, video_id, youtube_url):
     output_dir = os.path.join(base_output_path, video_id)
     os.makedirs(output_dir, exist_ok=True)
 
+    # Skip re-downloading if this video's audio is already here. The final
+    # output is always {video_id}.wav (fixed by --audio-format wav below),
+    # so this check is exact, not a guess -- without it, re-running this
+    # script against a partially-downloaded corpus re-downloads and
+    # re-converts every already-fetched file from scratch every time.
+    expected_output = os.path.join(output_dir, f"{video_id}.wav")
+    if os.path.exists(expected_output):
+        print(f"Already downloaded, skipping: {expected_output}")
+        return
+
     # Define the yt-dlp command
     yt_dlp_command = [
         'yt-dlp', '--retries', '5', '--no-check-certificate',

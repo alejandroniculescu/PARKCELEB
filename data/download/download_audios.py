@@ -1,8 +1,19 @@
 import os
+import random
 import sys
 import subprocess
+import time
 import pandas as pd
 from urllib.parse import urlparse, parse_qs
+
+# YouTube doesn't publish an official rate-limit threshold -- this range is
+# community practice, not a documented number. It only helps on an IP
+# that YouTube already trusts (throttling avoidance); it does NOT fix the
+# separate "Sign in to confirm you're not a bot" IP-reputation block seen
+# from datacenter/cloud IPs, which can trigger on the very first request
+# regardless of pacing.
+MIN_DELAY_SECONDS = 3
+MAX_DELAY_SECONDS = 8
 
 def extract_video_id(youtube_url):
     parsed_url = urlparse(youtube_url)
@@ -27,13 +38,21 @@ def download_youtube_content(base_output_path, video_id, youtube_url):
         print(f"Already downloaded, skipping: {expected_output}")
         return
 
-    # Define the yt-dlp command
+    # Define the yt-dlp command. --sleep-requests adds a delay between
+    # yt-dlp's own internal extraction requests (metadata/format lookups);
+    # the delay *between separate videos* is the time.sleep() below, since
+    # each invocation here only ever downloads one URL.
     yt_dlp_command = [
         'yt-dlp', '--retries', '5', '--no-check-certificate',
         '--extract-audio', '--audio-format', 'wav',
         '--output-na-placeholder', 'not_available',
+        '--sleep-requests', '1',
         '-o', os.path.join(output_dir, '%(id)s.%(ext)s'),
         youtube_url]
+
+    delay = random.uniform(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS)
+    print(f"Sleeping {delay:.1f}s before downloading {youtube_url}")
+    time.sleep(delay)
 
     # Run the command
     try:

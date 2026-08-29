@@ -42,11 +42,24 @@ def download_youtube_content(base_output_path, video_id, youtube_url):
     # yt-dlp's own internal extraction requests (metadata/format lookups);
     # the delay *between separate videos* is the time.sleep() below, since
     # each invocation here only ever downloads one URL.
+    #
+    # --print writes a line we can pick out of stdout to recover the
+    # video's actual upload date -- previously discarded entirely, since
+    # nothing here saved any yt-dlp metadata at all. Prefixed so it's
+    # unambiguous to parse out from yt-dlp's other progress output.
+    #
+    # --no-simulate is NOT optional here: --print on its own implies
+    # --simulate (metadata-only, no download) unless a later WHEN-stage is
+    # used or --no-simulate is passed explicitly. Confirmed the hard way --
+    # without it, yt-dlp exits 0, prints the date, and silently downloads
+    # nothing at all.
+    upload_date_marker = "UPLOAD_DATE:"
     yt_dlp_command = [
         'yt-dlp', '--retries', '5', '--no-check-certificate',
         '--extract-audio', '--audio-format', 'wav',
         '--output-na-placeholder', 'not_available',
-        '--sleep-requests', '1',
+        '--sleep-requests', '1', '--no-simulate',
+        '--print', f'{upload_date_marker}%(upload_date)s',
         '-o', os.path.join(output_dir, '%(id)s.%(ext)s'),
         youtube_url]
 
@@ -56,10 +69,28 @@ def download_youtube_content(base_output_path, video_id, youtube_url):
 
     # Run the command
     try:
-        subprocess.run(yt_dlp_command, check=True)
+        result = subprocess.run(yt_dlp_command, check=True, capture_output=True, text=True)
+        print(result.stdout)
         print(f"Downloaded and processed: {youtube_url}")
+        save_upload_date(output_dir, video_id, result.stdout, upload_date_marker)
     except subprocess.CalledProcessError as e:
         print(f"Failed to download {youtube_url}: {e}")
+
+
+def save_upload_date(output_dir, video_id, yt_dlp_stdout, marker):
+    """Pull the YYYYMMDD upload date out of yt-dlp's --print output and
+    save it as a small sidecar file, since generate_speakers_folders.py
+    and everything downstream currently has no way to know which day
+    (or even year) any given video was actually published."""
+    date_path = os.path.join(output_dir, f"{video_id}_upload_date.txt")
+    for line in yt_dlp_stdout.splitlines():
+        if line.startswith(marker):
+            upload_date = line[len(marker):].strip()
+            with open(date_path, "w") as f:
+                f.write(upload_date)
+            print(f"Saved upload date {upload_date} to {date_path}")
+            return
+    print(f"Warning: no upload date found in yt-dlp output for {video_id}")
 
 # Function to process metadata files in a given directory
 def process_metadata_files(directory):

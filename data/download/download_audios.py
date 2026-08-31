@@ -53,9 +53,21 @@ def download_youtube_content(base_output_path, video_id, youtube_url):
     # used or --no-simulate is passed explicitly. Confirmed the hard way --
     # without it, yt-dlp exits 0, prints the date, and silently downloads
     # nothing at all.
+    #
+    # --cookies-from-browser / --remote-components: after sustained
+    # download volume, YouTube started returning "Sign in to confirm
+    # you're not a bot" on this IP (the same bot-detection that blocked
+    # ahms originally). Authenticating with a real logged-in browser
+    # session gets past that specific check. That then surfaced a second,
+    # separate failure ("The page needs to be reloaded") -- yt-dlp needs
+    # to run a JS challenge-solver script it doesn't ship with by default;
+    # --remote-components ejs:github fetches it. Both confirmed necessary
+    # together via a manual test download before adding here.
     upload_date_marker = "UPLOAD_DATE:"
     yt_dlp_command = [
         'yt-dlp', '--retries', '5', '--no-check-certificate',
+        '--cookies-from-browser', 'firefox',
+        '--remote-components', 'ejs:github',
         '--extract-audio', '--audio-format', 'wav',
         '--output-na-placeholder', 'not_available',
         '--sleep-requests', '1', '--no-simulate',

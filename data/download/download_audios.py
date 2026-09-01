@@ -160,8 +160,15 @@ if __name__ == "__main__":
     #script is here: /export/b16/afavaro/parkceleb-publication/PARKCELEB/data/download
     root_directory = sys.argv[1] #/export/fs06/afavaro/parkceleb_zenodo/anonym_trial/
 
-    # Directories to traverse
-    subdirectories = ['PD', 'CN']
+    # Directories to traverse -- auto-discovered rather than hardcoded to
+    # ['PD', 'CN']: this script is reused for other corpora with different
+    # group names (e.g. ADCeleb's AD/CN), and a hardcoded list silently
+    # skips any group not named exactly 'PD' or 'CN' -- confirmed the hard
+    # way, ADCeleb's whole AD group downloaded zero videos because of this.
+    subdirectories = sorted(
+        d for d in os.listdir(root_directory)
+        if os.path.isdir(os.path.join(root_directory, d))
+    )
     for subdir in subdirectories:
         subdir_path = os.path.join(root_directory, subdir)
         if os.path.exists(subdir_path):
